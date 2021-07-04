@@ -12,60 +12,60 @@ boxes = {
   'netology4' => '44',  
   'netology5' => '55',  
 }   
-''' bash
-keepalived.conf: 
-vrrp_instance VI_1 {
-    state MASTER
-    interface eth1
-    virtual_router_id 33
-    priority 99 / 22
-    advert_int 1
-    authentication {
-        auth_type PASS
-        auth_pass netology_secret
-    }
-    virtual_ipaddress {
-        172.28.128.210/24 dev eth1
-    }
-}
-
-virtual_server 172.28.128.210 80 {
-    delay_loop 6
-    lb_algo rr
-    lb_kind DR
-    protocol TCP
-
-    real_server 172.28.128.44 80 {
-        TCP_CHECK {
-                connect_timeout 10
+    ```bash  
+        keepalived.conf: 
+        vrrp_instance VI_1 {
+            state MASTER
+            interface eth1
+            virtual_router_id 33
+            priority 99 / 22
+            advert_int 1
+            authentication {
+                auth_type PASS
+                auth_pass netology_secret
+            }
+            virtual_ipaddress {
+                172.28.128.210/24 dev eth1
+            }
         }
-    }
-    real_server 172.28.128.55 80 {
-        TCP_CHECK {
-                connect_timeout 10
+        
+        virtual_server 172.28.128.210 80 {
+            delay_loop 6
+            lb_algo rr
+            lb_kind DR
+            protocol TCP
+        
+            real_server 172.28.128.44 80 {
+                TCP_CHECK {
+                        connect_timeout 10
+                }
+            }
+            real_server 172.28.128.55 80 {
+                TCP_CHECK {
+                        connect_timeout 10
+                }
+            }
         }
-    }
-}
-vagrant@netology1:~$ for i in {1..50}; do curl -I -s 172.28.128.210>/dev/null; done
-vagrant@netology2:/etc/keepalived$ sudo ipvsadm -Ln
-IP Virtual Server version 1.2.1 (size=4096)
-Prot LocalAddress:Port Scheduler Flags
-  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
-TCP  172.28.128.210:80 rr
-  -> 172.28.128.44:80             Route   1      0          25
-  -> 172.28.128.55:80             Route   1      0          26
-vagrant@netology2:/etc/keepalived$ sudo systemctl stop keepalived
-vagrant@netology1:~$ for i in {1..50}; do curl -I -s 172.28.128.210>/dev/null; done
-vagrant@netology3:/etc/keepalived$ sudo ipvsadm -Ln
-IP Virtual Server version 1.2.1 (size=4096)
-Prot LocalAddress:Port Scheduler Flags
-  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
-TCP  172.28.128.210:80 rr
-  -> 172.28.128.44:80             Route   1      0          25
-  -> 172.28.128.55:80             Route   1      0          26
-'''
+        vagrant@netology1:~$ for i in {1..50}; do curl -I -s 172.28.128.210>/dev/null; done
+        vagrant@netology2:/etc/keepalived$ sudo ipvsadm -Ln
+        IP Virtual Server version 1.2.1 (size=4096)
+        Prot LocalAddress:Port Scheduler Flags
+          -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+        TCP  172.28.128.210:80 rr
+          -> 172.28.128.44:80             Route   1      0          25
+          -> 172.28.128.55:80             Route   1      0          26
+        vagrant@netology2:/etc/keepalived$ sudo systemctl stop keepalived
+        vagrant@netology1:~$ for i in {1..50}; do curl -I -s 172.28.128.210>/dev/null; done
+        vagrant@netology3:/etc/keepalived$ sudo ipvsadm -Ln
+        IP Virtual Server version 1.2.1 (size=4096)
+        Prot LocalAddress:Port Scheduler Flags
+          -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+        TCP  172.28.128.210:80 rr
+          -> 172.28.128.44:80             Route   1      0          25
+          -> 172.28.128.55:80             Route   1      0          26
+    ```
 1. В лекции мы использовали только 1 VIP адрес для балансировки. У такого подхода несколько отрицательных моментов, один из которых – невозможность активного использования нескольких хостов (1 адрес может только переехать с master на standby). Подумайте, сколько адресов оптимально использовать, если мы хотим без какой-либо деградации выдерживать потерю 1 из 3 хостов при входящем трафике 1.5 Гбит/с и физических линках хостов в 1 Гбит/с? Предполагается, что мы хотим задействовать 3 балансировщика в активном режиме (то есть не 2 адреса на 3 хоста, один из которых в обычное время простаивает).  
-Чтобы в активном режиме работало 3 хоста одновременно надо не менее 3 адресов.
+Чтобы в активном режиме работало 3 хоста одновременно надо 3 адреса.
 
  ---
 
