@@ -1,85 +1,88 @@
-# Домашнее задание к занятию "3.9. Элементы безопасности информационных систем"
+# Домашнее задание к занятию "4.1. Командная оболочка Bash: Практические навыки"
 
-1. Установите [Hashicorp Vault](https://learn.hashicorp.com/vault) в виртуальной машине Vagrant/VirtualBox. Это не является обязательным для выполнения задания, но для лучшего понимания что происходит при выполнении команд (посмотреть результат в UI), можно по аналогии с netdata из прошлых лекций пробросить порт Vault на localhost:
+## Обязательные задания
 
-    ```bash
-    config.vm.network "forwarded_port", guest: 8200, host: 8200
-    ```
+1. Есть скрипт:
+	```bash
+	a=1
+	b=2
+	c=a+b
+	d=$a+$b
+	e=$(($a+$b))
+	```
+	* Какие значения переменным c,d,e будут присвоены?
+	root@727730487a06:/# echo $c  
+	a+b  
+	root@727730487a06:/# echo $d  
+	1+2  
+	root@727730487a06:/# echo $e  
+	3  
+	* Почему?  
+	При инициализации переменной $c не указаны a и b не указаны как переменные, поэтому они обработаны как строки.  
+	При инициализации переменной $d переменные $a и $b обработаны, но итог получился строкой, т.к. $d не задана явно как числовая переменная и действие сложения не в скобках.
+	Переменная $e все задано корректно, поэтому значение рассчитано из переменных $a и $b.
 
-    Однако, обратите внимание, что только-лишь проброса порта не будет достаточно – по-умолчанию Vault слушает на 127.0.0.1; добавьте к опциям запуска `-dev-listen-address="0.0.0.0:8200"`.
-1. Запустить Vault-сервер в dev-режиме (дополнив ключ `-dev` упомянутым выше `-dev-listen-address`, если хотите увидеть UI).  
-vagrant@vagrant:~$ export VAULT_DEV_LISTEN_ADDRESS="0.0.0.0:8200"  
-vagrant@vagrant:~$ vault server -dev  
-1. Используя [PKI Secrets Engine](https://www.vaultproject.io/docs/secrets/pki), создайте Root CA и Intermediate CA.
-Обратите внимание на [дополнительные материалы](https://learn.hashicorp.com/tutorials/vault/pki-engine) по созданию CA в Vault, если с изначальной инструкцией возникнут сложности.
-Настройка Intermediate CA после ROOT CA  
-```bash
-vagrant@vagrant:~$ vault write pki_int/intermediate/generate/internal common_name="myvault.com Intermediate Authority" ttl=43800h
-vagrant@vagrant:~$ vault write -format=json pki_int/intermediate/generate/internal \
->         common_name="example.com Intermediate Authority" \
->         | jq -r '.data.csr' > pki_intermediate.csr
+1. На нашем локальном сервере упал сервис и мы написали скрипт, который постоянно проверяет его доступность, записывая дату проверок до тех пор, пока сервис не станет доступным. В скрипте допущена ошибка, из-за которой выполнение не может завершиться, при этом место на Жёстком Диске постоянно уменьшается. Что необходимо сделать, чтобы его исправить:
+	```bash
+	while ((1==1)
+	do
+	curl https://localhost:4757
+	if (($? != 0))
+	then
+	date >> curl.log
+	fi
+	done
+	```
+ В данном случае никогда не прервется цикл while, т.к. нет условия выхода из него, 1 всегда равно 1 и нет команды break.
 
-vagrant@vagrant:~$
-vagrant@vagrant:~$ vault write -format=json pki/root/sign-intermediate csr=@pki_intermediate.csr \
->         format=pem_bundle ttl="43800h" \
->         | jq -r '.data.certificate' > intermediate.cert.pem
-vagrant@vagrant:~$ vault write pki_int/intermediate/set-signed certificate=@intermediate.cert.pem
-Success! Data written to: pki_int/intermediate/set-signed
-vagrant@vagrant:~$ vault write pki_int/roles/example-dot-com \
->         allowed_domains="example.com" \
->         allow_subdomains=true \
->         max_ttl="720h"
-Success! Data written to: pki_int/roles/example-dot-com
-```
-1. Согласно этой же инструкции, подпишите Intermediate CA csr на сертификат для тестового домена (например, `netology.example.com` если действовали согласно инструкции).  
-   После настройки Vault      
-vault write pki_int/issue/example-dot-com common_name="netology.example.com" ttl="240h" > vault.netology.example.com.crt
-   
-1. Поднимите на localhost nginx, сконфигурируйте default vhost для использования подписанного Vault Intermediate CA сертификата и выбранного вами домена. Сертификат из Vault подложить в nginx руками.  
-```bash
-vagrant@vagrant:~$ cat /etc/nginx/conf.d/example.com.conf
-server {
-    listen         443 ssl;
-    server_name    netology.example.com;
-    ssl_certificate     /usr/local/nginx/conf/cert.pem;
-    ssl_certificate_key /usr/local/nginx/conf/cert.key;
-    gzip           off;
-}
-```   
-1. Модифицировав `/etc/hosts` и [системный trust-store](http://manpages.ubuntu.com/manpages/focal/en/man8/update-ca-certificates.8.html), добейтесь безошибочной с точки зрения HTTPS работы curl на ваш тестовый домен (отдающийся с localhost). Рекомендуется добавлять в доверенные сертификаты Intermediate CA. Root CA добавить было бы правильнее, но тогда при конфигурации nginx потребуется включить в цепочку Intermediate, что выходит за рамки лекции. Так же, пожалуйста, не добавляйте в доверенные сам сертификат хоста.
-```bash
-vagrant@vagrant:/usr/share/ca-certificates/netology$ cat /etc/hosts
-127.0.0.1       localhost  netology.example.com
-127.0.1.1       vagrant.vm      vagrant
-vagrant@vagrant:/usr/share/ca-certificates/netology$ sudo mv intermediate.cert.pem inter.crt
-vagrant@vagrant:/usr/share/ca-certificates/netology$ sudo dpkg-reconfigure ca-certificates
-Updating certificates in /etc/ssl/certs...
-1 added, 0 removed; done.
-Processing triggers for ca-certificates (20201027ubuntu0.20.04.1) ...
-Updating certificates in /etc/ssl/certs...
-0 added, 0 removed; done.
-Running hooks in /etc/ca-certificates/update.d...
-done.
-vagrant@vagrant:/usr/share/ca-certificates/netology$ curl https://netology.example.com --head
-HTTP/1.1 200 OK
-```
-1. [Ознакомьтесь](https://letsencrypt.org/ru/docs/client-options/) с протоколом ACME и CA Let's encrypt. Если у вас есть во владении доменное имя с платным TLS-сертификатом, который возможно заменить на LE, или же без HTTPS вообще, попробуйте воспользоваться одним из предложенных клиентов, чтобы сделать веб-сайт безопасным (или перестать платить за коммерческий сертификат).  
-Done  
-   
-   
-**Дополнительное задание вне зачета.** Вместо ручного подкладывания сертификата в nginx, воспользуйтесь [consul-template](https://medium.com/hashicorp-engineering/pki-as-a-service-with-hashicorp-vault-a8d075ece9a) для автоматического подтягивания сертификата из Vault.
- 
- ---
+1. Необходимо написать скрипт, который проверяет доступность трёх IP: 192.168.0.1, 173.194.222.113, 87.250.250.242 по 80 порту и записывает результат в файл log. Проверять доступность необходимо пять раз для каждого узла
+	```bash
+	#!/usr/bin/env bash
+	array_ips=('192.168.0.1' '173.194.222.113' '87.250.250.242')
+	array_int=(0 1 2 3 4)
+	for i in ${array_ips[@]}
+	do
+	  for attempt in ${array_int[@]}
+	  do 
+		curl "http://$i"
+		status=$?
+		printf 'host: %s, status: %s\n' "$i" "$status" >> log
+	  done
+	done
+
+	```
+
+1. Необходимо дописать скрипт из предыдущего задания так, чтобы он выполнялся до тех пор, пока один из узлов не окажется недоступным. Если любой из узлов недоступен - IP этого узла пишется в файл error, скрипт прерывается
+
+	```bash
+	#!/usr/bin/env bash
+	status=0
+	while (($status==0))
+	do
+	  array_ips=('192.168.0.1' '173.194.222.113' '87.250.250.242')
+	  for i in ${array_ips[@]}
+	    do
+	      curl "http://$i"
+	      status=$?
+	      if (("$status" != '0'))
+		    then
+		    echo "$i" > error
+		    break
+	      fi
+	      printf 'host: %s, status: %s\n' "$i" "$status" >> log
+	    done
+	done
+	```
+
+
+## Дополнительное задание (со звездочкой*) - необязательно к выполнению
+
+Мы хотим, чтобы у нас были красивые сообщения для коммитов в репозиторий. Для этого нужно написать локальный хук для git, который будет проверять, что сообщение в коммите содержит код текущего задания в квадратных скобках и количество символов в сообщении не превышает 30. Пример сообщения: \[04-script-01-bash\] сломал хук.
+
+---
 
 ### Как оформить ДЗ?
 
-Домашнее задание выполните в файле readme.md в github репозитории. В личном кабинете отправьте на проверку ссылку на .md-файл в вашем репозитории.
-
-Также вы можете выполнить задание в [Google Docs](https://docs.google.com/document/u/0/?tgif=d) и отправить в личном кабинете на проверку ссылку на ваш документ.
-Название файла Google Docs должно содержать номер лекции и фамилию студента. Пример названия: "1.1. Введение в DevOps — Сусанна Алиева"
-Перед тем как выслать ссылку, убедитесь, что ее содержимое не является приватным (открыто на комментирование всем, у кого есть ссылка). 
-Если необходимо прикрепить дополнительные ссылки, просто добавьте их в свой Google Docs.
-
-Любые вопросы по решению задач задавайте в чате Slack.
+Выполненное домашнее задание пришлите ссылкой на .md-файл в вашем репозитории.
 
 ---
