@@ -17,7 +17,7 @@
 	c = a + int(b)
 
 1. Мы устроились на работу в компанию, где раньше уже был DevOps Engineer. Он написал скрипт, позволяющий узнать, какие файлы модифицированы в репозитории, относительно локальных изменений. Этим скриптом недовольно начальство, потому что в его выводе есть не все изменённые файлы, а также непонятен полный путь к директории, где они находятся. Как можно доработать скрипт ниже, чтобы он исполнял требования вашего руководителя?
-
+	
 	```python
     #!/usr/bin/env python3
 
@@ -80,48 +80,48 @@
 
 	```python
 	#!/usr/bin/env python3/usr/bin/env python3
-import socket
-import time
+	import socket
+	import time
 
-def get_host_ips(name):
-    try:
-        host_ips = socket.gethostbyname_ex(name)[2]
-    except Exception as e:
-        return False
-    return host_ips
+	def get_host_ips(name):
+	    try:
+	        host_ips = socket.gethostbyname_ex(name)[2]
+	    except Exception as e:
+	        return False
+	    return host_ips
 
-def show_ips(name, host_ips):
-    print('{} - {}'.format(name, ', '.join(host_ips)))
+	def show_ips(name, host_ips):
+	    print('{} - {}'.format(name, ', '.join(host_ips)))
 
-def show_error(name, host_ips, prev_ips):
-    print('[ERROR] {} IP mismatch: {} {}'.format(name, ', '.join(host_ips), ', '.join(prev_ips)))
-
-
-def check_ips(host_ips, prev_ips):
-    if set(host_ips) == set(prev_ips):
-        return True
-    else:
-        return False
+	def show_error(name, host_ips, prev_ips):
+	    print('[ERROR] {} IP mismatch: {} {}'.format(name, ', '.join(host_ips), ', '.join(prev_ips)))
 
 
-names = ['drive.google.com', 'mail.google.com', 'google.com', 'kek.kek', 'yandex.ru']
-prev_ips = {}
+	def check_ips(host_ips, prev_ips):
+	    if set(host_ips) == set(prev_ips):
+	        return True
+	    else:
+	        return False
 
-while True:
-    for name in names:
-        host_ips = get_host_ips(name)
-        if not host_ips:
-            print('{} service unavailable'.format(name))
-            continue
-        if name not in prev_ips.keys():
-            prev_ips[name] = host_ips
-        if check_ips(host_ips, prev_ips[name]):
-            show_ips(name, host_ips)
-        else:
-            show_error(name, host_ips,prev_ips[name])
-        prev_ips[name] = host_ips
-    time.sleep(5)
-	
+
+	names = ['drive.google.com', 'mail.google.com', 'google.com']
+	prev_ips = {}
+
+	while True:
+	    for name in names:
+	        host_ips = get_host_ips(name)
+	        if not host_ips:
+	            print('{} service unavailable'.format(name))
+	            continue
+	        if name not in prev_ips.keys():
+	            prev_ips[name] = host_ips
+	        if check_ips(host_ips, prev_ips[name]):
+	            show_ips(name, host_ips)
+	        else:
+	            show_error(name, host_ips,prev_ips[name])
+	        prev_ips[name] = host_ips
+	    time.sleep(5)
+		
 	```
 
 ## Дополнительное задание (со звездочкой*) - необязательно к выполнению
